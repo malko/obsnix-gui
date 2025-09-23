@@ -1,0 +1,12 @@
+{
+	"packageManager": "pnpm@10.14.0",
+	"name": "obsbot",
+	"version": "0.0.0",
+	"description": "This is a monospace directory",
+	"workspaces": [
+		"libs/*",
+		"packages/*",
+		"apps/*"
+	],
+	"private": true
+}
