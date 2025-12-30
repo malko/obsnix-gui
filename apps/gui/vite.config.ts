@@ -15,7 +15,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['obsbot-sdk'], // Remove this line to bundle obsbot-sdk
+              external: [], // obsbot-sdk is bundled
             },
           },
         }
