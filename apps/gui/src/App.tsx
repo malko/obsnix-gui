@@ -148,7 +148,7 @@ function App() {
   }
   return (
     <>
-    <h1>OBSBOT Tiny 2 Control</h1>
+    <h1>OBSNIX: Obsbot control center</h1>
 
     <div className="main-container">
         <div id="video-container">

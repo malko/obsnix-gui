@@ -1,5 +1,10 @@
 # Obsbot Linux GUI
 
+> 📍 For more information on OBSNIX itself please check the [app/gui README](apps/gui/README.md). 👈 \
+\
+This README covers the monospace repository structure and how to get started with development for this project.
+------------
+
 This repository is a **[monospace](https://github.com/software-t-rex/monospace)** containing a GUI application for controlling OBSBOT cameras, primarily targeted at Linux users.
 
 The project is structured as a monospace, which is a tool for managing multi-project repositories. You can learn more about monospace [here](https://github.com/software-t-rex/monospace).

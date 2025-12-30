@@ -9,10 +9,11 @@ const sdkCopier = require('./electron-builder-hooks/sdk-copier.cjs');
 module.exports = {
   ...commonConfig,
   mac: {
-    target: ["dmg", "zip"],
+    target: ["zip"],
     artifactName: "${productName}-${version}-mac-${arch}.${ext}",
     hardenedRuntime: true,
     gatekeeperAssess: false,
+    icon: "public/icons/",
     extendInfo: {
       NSCameraUsageDescription: "This app requires camera access to control OBSBOT devices."
     }
@@ -25,6 +26,7 @@ module.exports = {
       }
     ],
     artifactName: "${productName}-${version}-win-${arch}.${ext}",
+    icon: "public/icons/",
     extraFiles: [
       {
         from: "../../libs/sdk/libdev_v2.1.0_7/windows/win64-release/libdev.dll",
@@ -42,6 +44,14 @@ module.exports = {
     artifactName: "${productName}-${version}-linux-${arch}.${ext}",
     synopsis: "OBSBOT GUI Application",
     description: "Control application for OBSBOT cameras",
+    icon: "public/icons/",
+    desktop: {
+      entry: {
+        "Name": "OBSNIX",
+        "Comment": "Control OBSBOT cameras AI tracking modes",
+        "Categories": "AudioVideo;Video;Utility;"
+      }
+    }
   },
   nsis: {
     oneClick: false,

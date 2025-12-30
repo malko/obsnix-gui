@@ -13,7 +13,15 @@ module.exports = {
     category: "Video",
     artifactName: "${productName}-${version}-linux-${arch}.${ext}",
     synopsis: "OBSBOT GUI Application",
+    icon: "public/icons/",
     description: "Control application for OBSBOT cameras",
+    desktop: {
+      entry: {
+        "Name": "OBSNIX",
+        "Comment": "Control OBSBOT cameras AI tracking modes",
+        "Categories": "AudioVideo;Video;Utility;"
+      }
+    }
   },
   afterPack: sdkCopier(true)
 };
