@@ -210,7 +210,7 @@ ipcMain.on('set-ai-mode', (event, data) => {
 
 ipcMain.handle('get-device-status', async (_event, deviceId: string) => {
   const device = osbotDevices.get(deviceId);
-  let status = {};
+  let status: any = {};
   if (device) {
     const family = device.getFamily();
     switch(family) {

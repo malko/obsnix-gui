@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "vite",
     "copy-native": "mkdir -p native-deps/build/Release && cp ../../libs/sdk/build/Release/obsbot_native.node native-deps/build/Release/",
-    "build": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs",
+    "build": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs && electron-builder --config electron-builder-appimage.config.cjs",
     "build:linux": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --linux",
+    "build:appimage": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder-appimage.config.cjs --linux",
     "build:win": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --win",
     "build:mac": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --mac",
     "publish": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --publish always",
@@ -18,9 +19,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "obsbot-sdk": "*",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "obsbot-sdk": "*"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
@@ -29,7 +30,7 @@
     "@typescript-eslint/parser": "^7.1.1",
     "@vitejs/plugin-react": "^4.2.1",
     "electron": "38.1.2",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.0.12",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
