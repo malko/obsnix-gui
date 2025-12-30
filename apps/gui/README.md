@@ -1,4 +1,4 @@
-# OBSBot GUI Application
+# OBSNIX: OBSBot GUI Application
 
 ## Description
 
@@ -15,11 +15,11 @@ The OBSBot GUI application is a user-friendly interface designed to control and 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/malko/obsbot.git
+   git clone https://github.com/malko/obsnix-gui.git
    ```
 2. Navigate to the GUI application directory:
    ```bash
-   cd obsbot/apps/gui
+   cd obsnix/apps/gui
    ```
 3. Install dependencies:
    ```bash
@@ -50,5 +50,5 @@ Contributions are welcome! To contribute:
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE.md) file for details.
 
