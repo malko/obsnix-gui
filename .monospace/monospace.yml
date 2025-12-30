@@ -1,4 +1,26 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/software-t-rex/monospace/main/apps/monospace/schemas/monospace.schema.json
+go_mod_prefix: example.com
 js_package_manager: npm@10.9.3
 preferred_output_mode: grouped
 projects:
+    apps/gui: internal
+    libs/sdk: git@github.com:malko/obsbot-js-sdk.git
+projects_aliases:
+    gui: apps/gui
+    sdk: libs/sdk
+pipeline:
+    gui#build:
+        description: Run build script from apps/gui/package.json
+    gui#dev:
+        description: Run dev script from apps/gui/package.json
+        persistent: true
+        output_mode: interleaved
+    sdk#build:
+        description: Run build script from libs/sdk/package.json
+        output_mode: interleaved
+    sdk#install:
+        description: Run install script from libs/sdk/package.json
+        output_mode: interleaved
+    sdk#test:
+        description: Run test script from libs/sdk/package.json
+        output_mode: interleaved
