@@ -39,10 +39,11 @@ module.exports = {
     ]
   },
   linux: {
-    target: ["flatpak", "snap", "deb", "rpm"],
+    // target: ["flatpak", "snap", "deb", "rpm"],
+    target: ["flatpak", "deb", "rpm"],
     category: "Video",
     artifactName: "${productName}-${version}-linux-${arch}.${ext}",
-    synopsis: "OBSBOT GUI Application",
+    synopsis: "OBSNIX GUI Application",
     description: "Control application for OBSBOT cameras",
     icon: "public/icons/",
     desktop: {

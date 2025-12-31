@@ -13,6 +13,10 @@ The OBSBot GUI application is a user-friendly interface designed to control and 
 
 ## Installation
 
+### From Pre-built Binaries
+Visit the [Releases page](https://github.com/malko/obsnix-gui/releases) to download the latest pre-built binaries for your platform.
+
+### From Source
 1. Clone the repository:
    ```bash
    git clone https://github.com/malko/obsnix-gui.git
@@ -40,6 +44,7 @@ The OBSBot GUI application is a user-friendly interface designed to control and 
 - Working with multiple devices of the same model may lead to displaying one device while setting parameters on another.
   Users should be cautious when operating multiple devices simultaneously.
   This is due to limitations in how devices are identified via browser APIs.
+  changes will be made in future versions to distinguish the devices being set from the device being displayed.
 
 ## Contributing
 

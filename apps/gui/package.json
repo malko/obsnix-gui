@@ -1,8 +1,8 @@
 {
-  "name": "gui",
+  "name": "obsnix-gui",
   "private": true,
-  "version": "0.0.1",
-  "description": "OBSBOT Camera GUI Application",
+  "version": "0.0.2",
+  "description": "OBSNIX: OBSBOT Camera GUI Application",
   "author": "malko <jgotti at jgotti dot org>",
   "homepage": "https://github.com/malko/obsnix-gui",
   "type": "module",
@@ -14,7 +14,7 @@
     "build:appimage": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder-appimage.config.cjs --linux",
     "build:win": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --win",
     "build:mac": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --mac",
-    "publish": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --publish always",
+    "publish": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --publish always && electron-builder --config electron-builder-appimage.config.cjs --publish always",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
