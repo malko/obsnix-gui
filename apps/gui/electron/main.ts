@@ -112,6 +112,95 @@ app.on('window-all-closed', () => {
   }
 })
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Chromium exposes camera device IDs as HMAC-SHA256(origin, rawDeviceId + salt).
+ * The salt lives either in the profile Preferences file (`media.device_id_salt`)
+ * or, when media device ID partitioning is enabled, in a `MediaDeviceSalts`
+ * SQLite database next to it. Return every salt we can find and let the
+ * renderer try them all (it verifies each candidate against the real
+ * `enumerateDevices()` output, so a wrong/half-read salt is harmless).
+ */
+const readPartitionedSalts = async (dbPath: string): Promise<string[]> => {
+  if (!fs.existsSync(dbPath)) return [];
+  try {
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      const rows = db.prepare('SELECT salt FROM media_device_salts').all() as Array<{ salt?: string }>;
+      return rows.map((row) => row.salt).filter((salt): salt is string => Boolean(salt));
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    console.warn('Could not read MediaDeviceSalts database:', error);
+    return [];
+  }
+};
+
+const readMediaDeviceSalts = async (): Promise<string[]> => {
+  const salts = new Set<string>();
+  const userData = app.getPath('userData');
+
+  try {
+    const prefsPath = path.join(userData, 'Preferences');
+    if (fs.existsSync(prefsPath)) {
+      const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf8'));
+      const salt = prefs?.media?.device_id_salt;
+      if (typeof salt === 'string' && salt) salts.add(salt);
+    }
+  } catch (error) {
+    console.warn('Could not read media device salt from Preferences:', error);
+  }
+
+  for (const salt of await readPartitionedSalts(path.join(userData, 'MediaDeviceSalts'))) {
+    salts.add(salt);
+  }
+
+  return Array.from(salts);
+};
+
+const V4L2_CLASS_DIR = '/sys/class/video4linux';
+
+const findUsbDevicePath = (videoNode: string): string | undefined => {
+  try {
+    let current = fs.realpathSync(path.join(V4L2_CLASS_DIR, videoNode, 'device'));
+    while (current && current !== path.dirname(current)) {
+      if (fs.existsSync(path.join(current, 'idVendor'))) return current;
+      current = path.dirname(current);
+    }
+  } catch {
+    // not a V4L2/USB device
+  }
+  return undefined;
+};
+
+/**
+ * A single OBSBOT camera can expose several `/dev/videoN` nodes. The SDK may
+ * pick a different one than Chromium, so return the path of every video node
+ * belonging to the same physical USB device and let the HMAC verification
+ * pick the right one.
+ */
+const getVideoPathCandidates = (videoPath: string): string[] => {
+  if (process.platform !== 'linux' || !videoPath) return videoPath ? [videoPath] : [];
+  const node = path.basename(videoPath);
+  if (!/^video\d+$/.test(node)) return [videoPath];
+
+  const usbDevice = findUsbDevicePath(node);
+  if (!usbDevice) return [videoPath];
+
+  try {
+    const siblings = fs
+      .readdirSync(V4L2_CLASS_DIR)
+      .filter((name) => /^video\d+$/.test(name) && findUsbDevicePath(name) === usbDevice)
+      .map((name) => path.join('/dev', name));
+    return siblings.length > 0 ? siblings : [videoPath];
+  } catch {
+    return [videoPath];
+  }
+};
+
 const osbotDevices = new Map<string, BaseDevice>();
 const refreshDeviceList = () => {
   const devices = osbotSdk.getDevList();
@@ -141,9 +230,10 @@ const getDeviceListForFrontend = async (): Promise<Record<string, FrontEndDevice
       modelCode,
       key,
       sn: device.getSn(),
+      family: device.getFamily(),
       capabilities: device.getCapabilities(),
       videoPath,
-      mediaDeviceLabelMatcher: new RegExp('OBSBOT ' + productType.replace(/\s+/g, `\\s*`), 'i'),
+      videoPaths: getVideoPathCandidates(videoPath),
     };
     return acc;
   }, {} as Record<string, FrontEndDevice>);
@@ -192,6 +282,46 @@ ipcMain.on('scan-obsbot-devices', async (event) => {
 });
 
 
+ipcMain.handle('get-media-device-salts', async () => {
+  try {
+    return await readMediaDeviceSalts();
+  } catch (error) {
+    console.error('Error reading media device salts:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('identify-device', async (_event, { sn }: { sn: string }) => {
+  const device = osbotDevices.get(sn);
+  if (!device) return { success: false, reason: 'unknown-device' };
+  try {
+    if (device.getFamily() === 'Tiny') {
+      device.gimbalMove(0, 40);
+      await delay(400);
+      device.gimbalMove(0, -40);
+      await delay(400);
+      device.gimbalMove(0, 0);
+      return { success: true, method: 'gimbal' };
+    }
+
+    const range = device.getZoomRange();
+    if (range && range.max > range.min) {
+      const current = device.getZoom();
+      const target = Math.min(range.max, current + Math.max(1, (range.max - range.min) * 0.25));
+      device.setZoom(target);
+      await delay(500);
+      device.setZoom(current);
+      return { success: true, method: 'zoom' };
+    }
+
+    return { success: false, reason: 'no-identifier' };
+  } catch (error) {
+    console.error('Error identifying device:', error);
+    return { success: false, reason: 'error' };
+  }
+});
+
+
 ipcMain.on('set-ai-mode', (event, data) => {
   const { deviceId, mode, subMode } = data;
   const device = osbotDevices.get(deviceId);
@@ -210,7 +340,7 @@ ipcMain.on('set-ai-mode', (event, data) => {
 
 ipcMain.handle('get-device-status', async (_event, deviceId: string) => {
   const device = osbotDevices.get(deviceId);
-  let status: any = {};
+  let status: unknown = {};
   if (device) {
     const family = device.getFamily();
     switch(family) {

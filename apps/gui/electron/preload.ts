@@ -25,13 +25,15 @@ const API= {
   },
   setAiMode: (deviceId:string , mode: number, subMode?: number) => ipcRenderer.send('set-ai-mode', { deviceId, mode, subMode }),
   listDevices: () => ipcRenderer.send('scan-obsbot-devices'),
+  getMediaDeviceSalts: (): Promise<string[]> => ipcRenderer.invoke('get-media-device-salts'),
+  identifyDevice: (sn: string) => ipcRenderer.invoke('identify-device', { sn }),
   onDeviceList: (callback: (devices: Record<string, FrontEndDevice>) => void) => {
     const cb = (_event, value) => callback(value)
     ipcRenderer.on('device-list', cb)
     return () => ipcRenderer.off('device-list', cb)
   },
   getDeviceStatus: (deviceId: string) => ipcRenderer.invoke('get-device-status', deviceId),
-  onDeviceStatus: (callback: (data: { deviceId: string; status: any }) => void) => {
+  onDeviceStatus: (callback: (data: { deviceId: string; status: unknown }) => void) => {
     const cb = (_event, value) => callback(value)
     ipcRenderer.on('device-status', cb)
     return () => ipcRenderer.off('device-status', cb)

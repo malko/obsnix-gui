@@ -41,10 +41,10 @@ Visit the [Releases page](https://github.com/malko/obsnix-gui/releases) to downl
 
 ## Limitations
 - The application has only been tested on Linux. Users are encouraged to report their experiences on other platforms.
-- Working with multiple devices of the same model may lead to displaying one device while setting parameters on another.
-  Users should be cautious when operating multiple devices simultaneously.
-  This is due to limitations in how devices are identified via browser APIs.
-  changes will be made in future versions to distinguish the devices being set from the device being displayed.
+- Matching OBSBOT devices (from the SDK) to system cameras (from Electron) is done through the device label, and on Linux through the camera driver path when possible.
+  When several devices of the same model are connected and cannot be told apart automatically, the source is flagged in the picker and you can assign the right system camera manually (the "Assign…" button, with an "Identify" helper that physically moves the selected device).
+  OS support for the exact matching (by device path) currently targets Linux, other platforms rely on the label/manual matching.
+- Matching is recomputed every time the connected cameras change. If a camera is moved to another port or replaced since your last manual assignment, the saved assignment is detected as stale (and will never point at another device's camera); it is flagged in the picker so you can assign it again.
 
 ## Contributing
 

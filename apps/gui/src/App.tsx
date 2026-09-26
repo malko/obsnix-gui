@@ -1,81 +1,81 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import './App.css'
 import { SourceSelector } from './components/SourceSelector'
-import { FrontEndDevice, type FrontEndDeviceWithMediaInfo } from '../types';
-import { AiSubModeHumans, AiWorkModes, TinyDevice } from 'obsbot-sdk/lib/tiny_device';
+import { DeviceMatcherDialog } from './components/DeviceMatcherDialog'
+import { FrontEndDevice, type FrontEndDeviceWithMediaInfo, type MediaDeviceCandidate, type DeviceStatus } from '../types';
+import { AiSubModeHumans, AiWorkModes } from 'obsbot-sdk/lib/tiny_device';
 import { ToggleButton } from './components/ToggleButton';
-
-const linkMediaDeviceToRealDevice = async (devices: Record<string, FrontEndDevice>): Promise<Record<string, FrontEndDeviceWithMediaInfo>> => {
-  const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-  const videoDevices = mediaDevices.filter(d => d.kind === 'videoinput');
-  console.log("Available video devices:", videoDevices);
-
-  const linkedDevices: Record<string, FrontEndDeviceWithMediaInfo> = {};
-  for (const [deviceId, device] of Object.entries(devices)) {
-    const matchingMediaDevice = videoDevices.find(md => {
-      const matcher = device.mediaDeviceLabelMatcher ? new RegExp(device.mediaDeviceLabelMatcher, 'i') : null;
-      if (matcher) {
-        return matcher.test(md.label);
-      }
-    });
-    if (matchingMediaDevice) {
-      linkedDevices[deviceId] = {
-        ...device,
-        mediaDeviceId: matchingMediaDevice.deviceId,
-        mediaDeviceLabel: matchingMediaDevice.label
-      };
-    } else {
-      linkedDevices[deviceId] = {
-        ...device,
-        mediaDeviceId: mediaDevices[0]?.deviceId || '',
-        mediaDeviceLabel: mediaDevices[0]?.label || 'Unknown Device'
-      };
-    }
-  }
-  return linkedDevices;
-};
+import { enumerateVideoInputs, linkMediaDevicesToRealDevices, type EnumeratedMediaDevice } from './utils/mediaDeviceMatching';
+import { loadManualMapping, setManualMappingEntry, removeManualMappingEntry, type ManualMapping } from './utils/manualMapping';
 
 
 function App() {
   // Load device list and manage state here
-  const [devices, setDevices] = useState<Record<string, FrontEndDevice & { mediaDeviceId: string, mediaDeviceLabel: string }>>({});
+  const [rawDevices, setRawDevices] = useState<Record<string, FrontEndDevice>>({});
+  const [devices, setDevices] = useState<Record<string, FrontEndDeviceWithMediaInfo>>({});
+  const [enumeratedDevices, setEnumeratedDevices] = useState<EnumeratedMediaDevice[]>([]);
+  // The raw device list the current enumeration was made for. Used to avoid
+  // linking once with stale enumeration and once again right after a refresh.
+  const [enumeratedFor, setEnumeratedFor] = useState<Record<string, FrontEndDevice> | null>(null);
+  const [mediaDeviceSalts, setMediaDeviceSalts] = useState<string[]>([]);
+  const [manualMapping, setManualMapping] = useState<ManualMapping>(() => loadManualMapping());
+  const [linkTick, setLinkTick] = useState(0);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [assigningDevice, setAssigningDevice] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-  const [status, setStatus] = useState<any>(null);
+  const [status, setStatus] = useState<DeviceStatus | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const playerPlay = useCallback(async () => {
-    if (selectedDevice && videoRef.current) {
-      try {
-        const device = devices[selectedDevice];
-        if (!device) {
-          console.error("Selected device not found");
-          alert("Selected device not found");
-          return;
-        }
-        if (!device.mediaDeviceId) {
-          console.error("No media device ID associated with selected device");
-          alert("No media device ID associated with selected device");
-          return;
-        }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: device.mediaDeviceId } }
-        });
-        videoRef.current.srcObject = stream;
-        console.log("Video stream started successfully");
-      } catch (err: any) {
-        console.error("Error accessing camera:", err);
-        alert(`Error accessing camera: ${err?.message || err}`);
+  // Keep the latest values available to the (stable) player callbacks without
+  // recreating them on every render, so the video is not restarted needlessly.
+  const devicesRef = useRef(devices);
+  const selectedDeviceRef = useRef(selectedDevice);
+  devicesRef.current = devices;
+  selectedDeviceRef.current = selectedDevice;
+
+  const playerPlay = useCallback(async (interactive = false) => {
+    const selected = selectedDeviceRef.current;
+    const video = videoRef.current;
+    if (!selected || !video) return;
+    const device = devicesRef.current[selected];
+    if (!device) {
+      console.error("Selected device not found");
+      if (interactive) alert("Selected device not found");
+      return;
+    }
+    if (!device.mediaDeviceId) {
+      // Matching may still be in progress. This is expected on startup before
+      // the enumeration finishes, so stay silent unless the user asked for it.
+      console.warn(`No system camera matched yet for ${device.productTypeName} (SN: ${device.sn})`);
+      if (interactive) {
+        alert(device.matchSource === 'none'
+          ? "No system camera is associated with this device. Use “Assign…” to pick the right camera."
+          : "Camera matching is not ready yet, please try again in a moment.");
+      }
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: device.mediaDeviceId } }
+      });
+      video.srcObject = stream;
+      console.log("Video stream started successfully");
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      if (interactive) {
+        alert(`Error accessing camera: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-  }, [selectedDevice, devices]);
+  }, []);
 
-  const playerStop = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
+  const playerStop = useCallback(() => {
+    const video = videoRef.current;
+    if (video && video.srcObject) {
+      const stream = video.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
+      video.srcObject = null;
     }
-  }
+  }, []);
   const setAiMode = useCallback((mode: number, subMode?: number) => {
     if (selectedDevice) {
       window.ipcRenderer.setAiMode(selectedDevice, mode, subMode);
@@ -90,11 +90,11 @@ function App() {
   useEffect(() => {
     const removeOnDeviceStatusListener = window.ipcRenderer.onDeviceStatus(({ deviceId, status }) => {
       console.log("Received device status update:", deviceId, status);
-      setStatus(status);
+      setStatus(status as DeviceStatus);
     });
-    const removeOnDeviceListListener = window.ipcRenderer.onDeviceList(async (deviceList: Record<string, FrontEndDevice>) => {
+    const removeOnDeviceListListener = window.ipcRenderer.onDeviceList((deviceList: Record<string, FrontEndDevice>) => {
       console.log("Received device list:", deviceList);
-      setDevices(await linkMediaDeviceToRealDevice(deviceList));
+      setRawDevices(deviceList);
       const keys = Object.keys(deviceList);
       if (keys.length === 1) {
         console.log("Auto-selecting the only available device:", keys[0], deviceList[keys[0]]);
@@ -107,20 +107,103 @@ function App() {
       }
     });
     return () => {
-      // clearTimeout(timer);
       removeOnDeviceListListener();
       removeOnDeviceStatusListener();
     }
-  }, [setStatus, selectedDevice, setSelectedDevice]);
+  }, [selectedDevice]);
 
   useEffect(() => {
     window.ipcRenderer.listDevices();
+    window.ipcRenderer.getMediaDeviceSalts()
+      .then((salts) => setMediaDeviceSalts(Array.isArray(salts) ? salts : []))
+      .catch((error) => console.warn("Could not load media device salts:", error));
+
+    const handleDeviceChange = () => setLinkTick((tick) => tick + 1);
+    navigator.mediaDevices?.addEventListener?.('devicechange', handleDeviceChange);
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.('devicechange', handleDeviceChange);
+    };
   }, []);
 
-  // bind video play/stop to selected device on device change
+  // Enumerate system cameras (after priming permission so labels/IDs are populated).
   useEffect(() => {
-    console.log("Video effect triggered - selectedDevice:", selectedDevice);
-    if (selectedDevice) {
+    if (Object.keys(rawDevices).length === 0) {
+      setEnumeratedDevices([]);
+      setEnumeratedFor(null);
+      return;
+    }
+    let cancelled = false;
+    enumerateVideoInputs()
+      .then((videos) => {
+        if (cancelled) return;
+        console.log("Available video devices:", videos);
+        setEnumeratedDevices(videos);
+        setEnumeratedFor(rawDevices);
+        setPermissionError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Error accessing camera permission:", error);
+        setPermissionError(error?.message || String(error));
+        setEnumeratedDevices([]);
+        setEnumeratedFor(rawDevices);
+      });
+    return () => { cancelled = true; };
+  }, [rawDevices, linkTick]);
+
+  // Link SDK devices to Electron media devices (exact HMAC, then heuristic/manual).
+  // Waiting for the enumeration of the current device list keeps this to a
+  // single pass per refresh instead of one stale + one fresh run.
+  useEffect(() => {
+    if (Object.keys(rawDevices).length === 0) {
+      setDevices({});
+      return;
+    }
+    if (enumeratedFor !== rawDevices) return;
+    let cancelled = false;
+    linkMediaDevicesToRealDevices(rawDevices, enumeratedDevices, {
+      salts: mediaDeviceSalts,
+      origin: window.location.origin,
+      manualMapping,
+    }).then((linked) => {
+      if (cancelled) return;
+      const summary = Object.values(linked).map((device) => ({
+        sn: device.sn,
+        product: device.productTypeName,
+        matchSource: device.matchSource,
+        mediaDeviceId: device.mediaDeviceId,
+        mediaDeviceLabel: device.mediaDeviceLabel,
+        videoPaths: device.videoPaths,
+      }));
+      console.log("Device match summary:", summary);
+      console.table?.(summary);
+      if (mediaDeviceSalts.length === 0) {
+        console.warn("No media device salt found, exact matching is disabled (using labels/manual mapping).");
+      }
+      setDevices(linked);
+    }).catch((error) => {
+      console.error("Error linking OBSBOT devices to system cameras:", error);
+    });
+    return () => { cancelled = true; };
+  }, [rawDevices, enumeratedDevices, enumeratedFor, mediaDeviceSalts, manualMapping]);
+
+  const handleManualAssign = useCallback((device: FrontEndDeviceWithMediaInfo, candidate: MediaDeviceCandidate) => {
+    setManualMapping(setManualMappingEntry(device.sn, candidate));
+    setAssigningDevice(null);
+  }, []);
+
+  const handleManualClear = useCallback((device: FrontEndDeviceWithMediaInfo) => {
+    setManualMapping(removeManualMappingEntry(device.sn));
+  }, []);
+
+  // Only react to the selected camera actually changing, not to every device
+  // list refresh (which would needlessly stop and restart the video stream).
+  const selectedMediaDeviceId = selectedDevice ? devices[selectedDevice]?.mediaDeviceId ?? '' : '';
+
+  // bind video play/stop to the selected device / matched camera on change
+  useEffect(() => {
+    console.log("Video effect triggered - selectedDevice:", selectedDevice, "mediaDeviceId:", selectedMediaDeviceId);
+    if (selectedDevice && selectedMediaDeviceId) {
       playerPlay();
       window.ipcRenderer.getDeviceStatus(selectedDevice).then(status => {
         console.log("status", status);
@@ -133,7 +216,7 @@ function App() {
     return () => {
       playerStop();
     };
-  }, [selectedDevice, playerPlay]);
+  }, [selectedDevice, selectedMediaDeviceId, playerPlay, playerStop]);
 
   if (!devices || Object.keys(devices).length === 0) {
     return (
@@ -146,6 +229,14 @@ function App() {
       </>
     );
   }
+  const assigning = assigningDevice ? devices[assigningDevice] : undefined;
+  const usedMediaDeviceIds = new Set(
+    Object.values(devices)
+      .filter((device) => device.sn !== assigning?.sn)
+      .map((device) => device.mediaDeviceId)
+      .filter(Boolean),
+  );
+
   return (
     <>
     <h1>OBSNIX: Obsbot control center</h1>
@@ -166,11 +257,24 @@ function App() {
             <div className="control-group">
                 <h2>Video</h2>
                 <div id="video-controls">
-                    <SourceSelector devices={devices} selected={selectedDevice} onSelect={setSelectedDevice} />
-                    <button id="refresh-cameras" onClick={() => window.ipcRenderer.listDevices()}>🔄</button>
-                    <button id="start-video" onClick={() => playerPlay()}>Display Video</button>
-                    <button id="stop-video" onClick={() => playerStop()}>Stop Video</button>
+                    <SourceSelector
+                      devices={devices}
+                      selected={selectedDevice}
+                      onSelect={setSelectedDevice}
+                      onAssign={setAssigningDevice}
+                      onClearManual={(key) => handleManualClear(devices[key])}
+                    />
+                    <div className="video-actions">
+                        <button id="refresh-cameras" onClick={() => window.ipcRenderer.listDevices()}>🔄</button>
+                        <button id="start-video" onClick={() => playerPlay(true)}>Display Video</button>
+                        <button id="stop-video" onClick={() => playerStop()}>Stop Video</button>
+                    </div>
                 </div>
+                {permissionError && (
+                  <p className="permission-error">
+                    Camera access was refused or unavailable, so cameras cannot be matched automatically: {permissionError}
+                  </p>
+                )}
             </div>
 
             <div className="control-group">
@@ -233,13 +337,13 @@ function App() {
                     >Group</button>
                 </div>
             </div>
-            {(devices[selectedDevice || ''] instanceof TinyDevice) ? '': <>
+            {(devices[selectedDevice || '']?.family === 'Tiny') && (
               <div className="control-group ai-gestures-group">
                   <h2>Ai gestures</h2>
                   <div id="toggle-controls">
                     <ToggleButton
                       label="Gesture Target"
-                      isActive={status?.gesture_target}
+                      isActive={Boolean(status?.gesture_target)}
                       tooltip={`${status?.gesture_target ? 'Disable' : 'Enable'} target gesture control.`}
                       onToggle={() => {
                         if (selectedDevice) {
@@ -254,7 +358,7 @@ function App() {
                     />
                     <ToggleButton
                       label="Gesture Zoom"
-                      isActive={status?.gesture_zoom}
+                      isActive={Boolean(status?.gesture_zoom)}
                       tooltip={`${status?.gesture_zoom ? 'Enable' : 'Disable'} zooming in and out with single hand gestures.`}
                       onToggle={() => {
                         if (selectedDevice) {
@@ -268,7 +372,7 @@ function App() {
                       }}
                     />
                     <ToggleButton label="Gesture Dynamic Zoom"
-                      isActive={status?.gesture_dynamic_zoom}
+                      isActive={Boolean(status?.gesture_dynamic_zoom)}
                       tooltip={`${status?.gesture_dynamic_zoom ? 'Disable' : 'Enable'} dynamic zooming based on two hand gestures.`}
                       onToggle={() => {
                         if (selectedDevice) {
@@ -283,7 +387,7 @@ function App() {
                     />
                     <ToggleButton
                       label="Gesture Mirror"
-                      isActive={status?.gesture_mirror}
+                      isActive={Boolean(status?.gesture_mirror)}
                       tooltip={`${status?.gesture_mirror ? 'Disable' : 'Enable'} reversing the camera movement direction for Dynamic Zoom.`}
                       onToggle={() => {
                         if (selectedDevice) {
@@ -297,8 +401,8 @@ function App() {
                       }}
                     />
                   </div>
-              </div></>
-            }
+              </div>
+            )}
 
             {/* <div className="control-group diagnostic-group">
                 <details>
@@ -311,6 +415,16 @@ function App() {
             </div> */}
         </div>
     </div>
+
+    {assigning && (
+      <DeviceMatcherDialog
+        device={assigning}
+        candidates={enumeratedDevices.filter((candidate) => !usedMediaDeviceIds.has(candidate.deviceId))}
+        onAssign={(candidate) => handleManualAssign(assigning, candidate)}
+        onClear={() => handleManualClear(assigning)}
+        onClose={() => setAssigningDevice(null)}
+      />
+    )}
     </>
   )
 }
