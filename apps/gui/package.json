@@ -7,8 +7,8 @@
   "homepage": "https://github.com/malko/obsnix-gui",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "copy-native": "mkdir -p native-deps/build/Release && cp ../../libs/sdk/build/Release/obsbot_native.node native-deps/build/Release/",
+    "dev": "npm run copy-native && vite",
+    "copy-native": "node scripts/copy-native.mjs",
     "build": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs -wlm && electron-builder --config electron-builder-appimage.config.cjs",
     "build:linux": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --linux",
     "build:appimage": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder-appimage.config.cjs --linux",
@@ -16,6 +16,8 @@
     "build:mac": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --mac",
     "publish": "npm run copy-native && tsc && vite build && electron-builder --config electron-builder.config.cjs --publish always && electron-builder --config electron-builder-appimage.config.cjs --publish always",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -37,7 +39,8 @@
     "typescript": "^5.2.2",
     "vite": "^7.1.7",
     "vite-plugin-electron": "^0.28.6",
-    "vite-plugin-electron-renderer": "^0.14.5"
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "vitest": "^5.0.2"
   },
   "main": "dist-electron/main.js"
 }

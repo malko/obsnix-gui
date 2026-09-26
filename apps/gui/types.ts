@@ -1,15 +1,30 @@
+export type MediaMatchSource = 'exact' | 'label' | 'ambiguous' | 'manual' | 'none';
+
+export type DeviceStatus = Record<string, unknown>;
+
+export type MediaDeviceCandidate = {
+  deviceId: string,
+  label: string,
+}
+
 export type FrontEndDevice = {
   productId: number,
   productTypeName: string,
   product: string,
   key: string,
   sn: string,
-  capabilities: any,
+  family: string,
+  capabilities: unknown,
   videoPath: string,
+  videoPaths?: string[],
   uuid: string,
   modelCode: string,
-  mediaDeviceLabelMatcher?: RegExp
 }
 
-
-export type FrontEndDeviceWithMediaInfo = FrontEndDevice & { mediaDeviceId: string, mediaDeviceLabel: string };
+export type FrontEndDeviceWithMediaInfo = FrontEndDevice & {
+  mediaDeviceId: string,
+  mediaDeviceLabel: string,
+  matchSource: MediaMatchSource,
+  matchCandidates?: MediaDeviceCandidate[],
+  staleManualMapping?: boolean,
+};
