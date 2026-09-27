@@ -45,6 +45,7 @@ Visit the [Releases page](https://github.com/malko/obsnix-gui/releases) to downl
   When several devices of the same model are connected and cannot be told apart automatically, the source is flagged in the picker and you can assign the right system camera manually (the "Assign…" button, with an "Identify" helper that physically moves the selected device).
   OS support for the exact matching (by device path) currently targets Linux, other platforms rely on the label/manual matching.
 - Matching is recomputed every time the connected cameras change. If a camera is moved to another port or replaced since your last manual assignment, the saved assignment is detected as stale (and will never point at another device's camera); it is flagged in the picker so you can assign it again.
+- The manual zoom control (slider + presets in the "Gimbal & Zoom" section) has only been tested against the **OBSBOT Tiny SE**. The zoom range/scale reported by other models may differ; the control derives its range from the device, but please report any mismatch.
 
 ## Contributing
 

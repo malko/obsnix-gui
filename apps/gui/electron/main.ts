@@ -405,6 +405,37 @@ ipcMain.handle('gimbal-reset', async (_event, data: { deviceId: string }) => {
   }
 });
 
+ipcMain.handle('get-zoom-range', async (_event, deviceId: string) => {
+  const device = osbotDevices.get(deviceId);
+  if (!device) return null;
+  try {
+    const capabilities = device.getCapabilities();
+    const zoom = capabilities?.zoom;
+    if (zoom && zoom.max > zoom.min) return zoom;
+  } catch (error) {
+    console.warn('Could not read zoom capabilities:', error);
+  }
+  try {
+    return device.getZoomRange();
+  } catch (error) {
+    console.warn('Could not read zoom range:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('set-zoom', async (_event, data: { deviceId: string; zoom: number }) => {
+  const { deviceId, zoom } = data;
+  const device = osbotDevices.get(deviceId);
+  if (!device) return { success: false, reason: 'unknown-device' };
+  try {
+    device.setZoom(zoom);
+    return { success: true };
+  } catch (error) {
+    console.error('Error setting zoom:', error);
+    return { success: false, reason: 'error' };
+  }
+});
+
 const toggleGestureHandler = async (_event, data: { deviceId: string; enable: boolean; gestureType: 'target' | 'zoom' | 'dynamicZoom' | 'mirror' }) => {
   const { deviceId, enable, gestureType } = data;
   const device = osbotDevices.get(deviceId);

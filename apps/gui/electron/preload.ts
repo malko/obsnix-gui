@@ -35,6 +35,8 @@ const API= {
   getDeviceStatus: (deviceId: string) => ipcRenderer.invoke('get-device-status', deviceId),
   moveGimbal: (deviceId: string, pitch: number, pan: number): Promise<{ success: boolean }> => ipcRenderer.invoke('gimbal-move', { deviceId, pitch, pan }),
   resetGimbal: (deviceId: string): Promise<{ success: boolean }> => ipcRenderer.invoke('gimbal-reset', { deviceId }),
+  getZoomRange: (deviceId: string): Promise<{ min: number; max: number; step?: number; default?: number } | null> => ipcRenderer.invoke('get-zoom-range', deviceId),
+  setZoom: (deviceId: string, zoom: number): Promise<{ success: boolean }> => ipcRenderer.invoke('set-zoom', { deviceId, zoom }),
   onDeviceStatus: (callback: (data: { deviceId: string; status: unknown }) => void) => {
     const cb = (_event, value) => callback(value)
     ipcRenderer.on('device-status', cb)

@@ -7,8 +7,10 @@ import { AiSubModeHumans, AiWorkModes } from 'obsbot-sdk/lib/tiny_device';
 import { ToggleButton } from './components/ToggleButton';
 import { GimbalControl } from './components/GimbalControl';
 import { CollapsibleSection } from './components/CollapsibleSection';
+import { ZoomControl } from './components/ZoomControl';
 import { RefreshIcon } from './components/icons';
 import { formatAngle, type GimbalAttitude } from './utils/gimbal';
+import { deviceRangeToUiRange, formatZoomFactor, isValidZoomRange, normalizeZoomRange, type ZoomRange } from './utils/zoom';
 import { enumerateVideoInputs, linkMediaDevicesToRealDevices, type EnumeratedMediaDevice } from './utils/mediaDeviceMatching';
 import { loadManualMapping, setManualMappingEntry, removeManualMappingEntry, type ManualMapping } from './utils/manualMapping';
 import { usePersistentState } from './hooks/usePersistentState';
@@ -31,6 +33,8 @@ function App() {
   const [status, setStatus] = useState<DeviceStatus | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mirrorVideo, setMirrorVideo] = usePersistentState<boolean>('obsnix:video-mirror', false);
+  const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
+  const [zoomValue, setZoomValue] = useState<number | undefined>(undefined);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Keep the latest values available to the (stable) player callbacks without
@@ -39,6 +43,13 @@ function App() {
   const selectedDeviceRef = useRef(selectedDevice);
   devicesRef.current = devices;
   selectedDeviceRef.current = selectedDevice;
+
+  const selectedFamily = selectedDevice ? devices[selectedDevice]?.family : undefined;
+  const zoomSendRef = useRef<{ last: number | null; timer: ReturnType<typeof setTimeout> | null; pending: number | null }>({
+    last: null,
+    timer: null,
+    pending: null,
+  });
 
   const playerPlay = useCallback(async (interactive = false) => {
     const selected = selectedDeviceRef.current;
@@ -205,6 +216,53 @@ function App() {
     setManualMapping(removeManualMappingEntry(device.sn));
   }, []);
 
+  const handleZoomChange = useCallback((next: number) => {
+    setZoomValue(next);
+    const state = zoomSendRef.current;
+    state.pending = next;
+    if (state.timer) return;
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      const target = state.pending;
+      const sn = selectedDeviceRef.current;
+      if (target == null || !sn || state.last === target) return;
+      state.last = target;
+      window.ipcRenderer.setZoom(sn, target);
+      window.ipcRenderer.getDeviceStatus(sn).then(setStatus);
+    }, 80);
+  }, []);
+
+  useEffect(() => () => {
+    if (zoomSendRef.current.timer) clearTimeout(zoomSendRef.current.timer);
+  }, []);
+
+  // Read the device range and convert it to the settable zoom domain
+  // (e.g. raw 0..12 -> 1.00..1.12), keeping the slider/values in SDK units.
+  useEffect(() => {
+    if (!selectedDevice || selectedFamily !== 'Tiny') {
+      setZoomRange(null);
+      return;
+    }
+    let cancelled = false;
+    window.ipcRenderer.getZoomRange(selectedDevice)
+      .then((result) => {
+        if (cancelled) return;
+        if (!isValidZoomRange(result)) {
+          setZoomRange(null);
+          return;
+        }
+        const uiRange = deviceRangeToUiRange(normalizeZoomRange(result));
+        setZoomRange(uiRange);
+        setZoomValue(uiRange.default ?? uiRange.min);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.warn('Could not read zoom range:', error);
+        setZoomRange(null);
+      });
+    return () => { cancelled = true; };
+  }, [selectedDevice, selectedFamily]);
+
   // Only react to the selected camera actually changing, not to every device
   // list refresh (which would needlessly stop and restart the video stream).
   const selectedMediaDeviceId = selectedDevice ? devices[selectedDevice]?.mediaDeviceId ?? '' : '';
@@ -276,6 +334,7 @@ function App() {
 
   const gimbalAttitude = status?.gimbal as GimbalAttitude | undefined;
   const gimbalAngles = `Pitch ${formatAngle(gimbalAttitude?.pitch)} · Pan ${formatAngle(gimbalAttitude?.pan)} · Roll ${formatAngle(gimbalAttitude?.roll)}`;
+  const effectiveZoomValue = zoomValue ?? (zoomRange ? (zoomRange.default ?? zoomRange.min) : undefined);
 
   return (
     <>
@@ -333,7 +392,7 @@ function App() {
             {selectedDevice && devices[selectedDevice]?.family === 'Tiny' && (
               <CollapsibleSection
                 id="gimbal"
-                title={<>Gimbal <span className="section-status">{gimbalAngles}</span></>}
+                title={<>Gimbal &amp; Zoom <span className="section-status">{gimbalAngles} · Zoom {formatZoomFactor(effectiveZoomValue, zoomRange ?? undefined)}</span></>}
                 defaultOpen={false}
               >
                   <GimbalControl
@@ -342,6 +401,13 @@ function App() {
                       window.ipcRenderer.getDeviceStatus(selectedDevice).then(setStatus);
                     }}
                   />
+                  {zoomRange && (
+                    <ZoomControl
+                      range={zoomRange}
+                      value={effectiveZoomValue ?? zoomRange.min}
+                      onChange={handleZoomChange}
+                    />
+                  )}
                   <p className="gimbal-hint">Manual control turns off AI tracking.</p>
               </CollapsibleSection>
             )}
