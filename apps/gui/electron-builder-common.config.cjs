@@ -7,6 +7,10 @@
 module.exports = {
   appId: "eu.gotti.obsnix",
   productName: "OBSNIX",
+  // The OBSBOT native addon is shipped prebuilt (native-deps -> build/Release)
+  // and is an N-API module, so there is no need to rebuild it for Electron.
+  // Rebuilding the workspace `obsbot-sdk` fails when cross-compiling.
+  npmRebuild: false,
   directories: {
     output: "release/${version}"
   },
