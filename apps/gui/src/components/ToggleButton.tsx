@@ -1,11 +1,13 @@
 import React from 'react';
+import './ToggleButton.css';
 
 export const ToggleButton: React.FC<{
 	label: string;
 	isActive: boolean;
 	tooltip?: string;
+	className?: string;
 	onToggle: () => void;
-}> = ({ label, isActive, tooltip, onToggle }) => {
+}> = ({ label, isActive, tooltip, className, onToggle }) => {
 	const trackStyle: React.CSSProperties = {
 		width: '40px',
 		height: '20px',
@@ -32,15 +34,9 @@ export const ToggleButton: React.FC<{
 		boxShadow: '0 1px 3px rgba(255, 255, 255, 0.2)',
 	};
 
-	const containerStyle: React.CSSProperties = {
-		display: 'flex',
-		alignItems: 'center',
-		gap: '8px',
-	};
-
 	return (
-		<div style={containerStyle} title={tooltip}>
-			<label>{label}</label>
+		<div className={`toggle-button-container ${className ??'' }`} title={tooltip}>
+			<label onClick={onToggle} style={{flexGrow:1, textAlign:"left"}}>{label}</label>
 			<button style={trackStyle} onClick={onToggle} aria-pressed={isActive}>
 				<span style={thumbStyle} />
 			</button>

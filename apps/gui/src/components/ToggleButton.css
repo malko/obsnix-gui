@@ -1,0 +1,25 @@
+.toggle-button-container {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	background-color: #3c3c3c;
+	border: 1px solid #555;
+	border-radius: 8px;
+	padding: 12px 15px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	font-size: 12px;
+	color:#d4d4d4;
+
+	&:hover {
+		background-color: rgba(255, 255, 255, 0.04);
+	}
+
+	&.flex-grow {
+		flex-grow: 1;
+	}
+
+	label {
+		cursor: pointer;
+	}
+}
