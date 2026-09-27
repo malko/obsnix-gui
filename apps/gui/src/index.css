@@ -537,6 +537,109 @@ button.active {
     color: #999;
 }
 
+/* Zoom control */
+.zoom-control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.zoom-control.is-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.zoom-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+}
+
+.zoom-label {
+    color: #bbb;
+}
+
+.zoom-value {
+    color: #9cdcfe;
+    font-variant-numeric: tabular-nums;
+}
+
+.zoom-track-wrap {
+    position: relative;
+    padding: 12px 0;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.zoom-rail {
+    position: relative;
+    height: 6px;
+    margin: 0 8px; /* keep the thumb inside at both ends */
+    border-radius: 3px;
+    background: #3c3c3c;
+}
+
+.zoom-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+    background: #007acc;
+}
+
+.zoom-dots {
+    position: absolute;
+    inset: 0;
+}
+
+.zoom-preset {
+    position: absolute;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border-radius: 50%;
+    background: #888;
+    border: 1px solid #1e1e1e;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.zoom-preset:hover {
+    background: #61dafb;
+}
+
+.zoom-preset.active {
+    background: #009e15;
+}
+
+.zoom-thumb {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #007acc;
+    border: 2px solid #d4d4d4;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    outline: none;
+}
+
+.zoom-thumb:focus-visible {
+    border-color: #61dafb;
+}
+
+.zoom-unavailable {
+    margin: 8px 0 0;
+    font-size: 0.85em;
+    color: #999;
+}
+
 /* Status shown inline in a section title (kept visible when collapsed) */
 .section-status {
     margin-left: 10px;
