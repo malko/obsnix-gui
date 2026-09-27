@@ -291,14 +291,30 @@ ipcMain.handle('get-media-device-salts', async () => {
   }
 });
 
+/**
+ * Manual gimbal control is ignored while AI tracking is active: per the SDK,
+ * "if the AI smart tracking is enabled, gimbal is always controlled by AI".
+ * Disable it before moving/resetting so the device actually follows our speed.
+ */
+const disableAiTracking = (device: BaseDevice) => {
+  if (device instanceof osbotSdk.TinyDevice) {
+    try {
+      device.setAiMode(osbotSdk.TinyDevice.AiWorkMode.None);
+    } catch (error) {
+      console.warn('Could not disable AI tracking before gimbal control:', error);
+    }
+  }
+};
+
 ipcMain.handle('identify-device', async (_event, { sn }: { sn: string }) => {
   const device = osbotDevices.get(sn);
   if (!device) return { success: false, reason: 'unknown-device' };
   try {
     if (device.getFamily() === 'Tiny') {
-      device.gimbalMove(0, 40);
+      disableAiTracking(device);
+      device.gimbalMove(0, 80);
       await delay(400);
-      device.gimbalMove(0, -40);
+      device.gimbalMove(0, -80);
       await delay(400);
       device.gimbalMove(0, 0);
       return { success: true, method: 'gimbal' };
@@ -357,6 +373,36 @@ ipcMain.handle('get-device-status', async (_event, deviceId: string) => {
   }
   ipcMain.emit('device-status', null, { deviceId, status });
   return status
+});
+
+ipcMain.handle('gimbal-move', async (_event, data: { deviceId: string; pitch: number; pan: number }) => {
+  const { deviceId, pitch, pan } = data;
+  const device = osbotDevices.get(deviceId);
+  if (!device) return { success: false, reason: 'unknown-device' };
+  try {
+    if (pitch !== 0 || pan !== 0) {
+      disableAiTracking(device);
+    }
+    device.gimbalMove(pitch, pan);
+    return { success: true };
+  } catch (error) {
+    console.error('Error moving gimbal:', error);
+    return { success: false, reason: 'error' };
+  }
+});
+
+ipcMain.handle('gimbal-reset', async (_event, data: { deviceId: string }) => {
+  const { deviceId } = data;
+  const device = osbotDevices.get(deviceId);
+  if (!device) return { success: false, reason: 'unknown-device' };
+  try {
+    disableAiTracking(device);
+    device.gimbalReset();
+    return { success: true };
+  } catch (error) {
+    console.error('Error resetting gimbal:', error);
+    return { success: false, reason: 'error' };
+  }
 });
 
 const toggleGestureHandler = async (_event, data: { deviceId: string; enable: boolean; gestureType: 'target' | 'zoom' | 'dynamicZoom' | 'mirror' }) => {

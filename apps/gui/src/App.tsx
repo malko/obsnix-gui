@@ -5,8 +5,13 @@ import { DeviceMatcherDialog } from './components/DeviceMatcherDialog'
 import { FrontEndDevice, type FrontEndDeviceWithMediaInfo, type MediaDeviceCandidate, type DeviceStatus } from '../types';
 import { AiSubModeHumans, AiWorkModes } from 'obsbot-sdk/lib/tiny_device';
 import { ToggleButton } from './components/ToggleButton';
+import { GimbalControl } from './components/GimbalControl';
+import { CollapsibleSection } from './components/CollapsibleSection';
+import { RefreshIcon } from './components/icons';
+import { formatAngle, type GimbalAttitude } from './utils/gimbal';
 import { enumerateVideoInputs, linkMediaDevicesToRealDevices, type EnumeratedMediaDevice } from './utils/mediaDeviceMatching';
 import { loadManualMapping, setManualMappingEntry, removeManualMappingEntry, type ManualMapping } from './utils/manualMapping';
+import { usePersistentState } from './hooks/usePersistentState';
 
 
 function App() {
@@ -24,6 +29,8 @@ function App() {
   const [assigningDevice, setAssigningDevice] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [status, setStatus] = useState<DeviceStatus | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [mirrorVideo, setMirrorVideo] = usePersistentState<boolean>('obsnix:video-mirror', false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Keep the latest values available to the (stable) player callbacks without
@@ -59,6 +66,7 @@ function App() {
         video: { deviceId: { exact: device.mediaDeviceId } }
       });
       video.srcObject = stream;
+      setIsPlaying(true);
       console.log("Video stream started successfully");
     } catch (err) {
       console.error("Error accessing camera:", err);
@@ -75,6 +83,7 @@ function App() {
       stream.getTracks().forEach(track => track.stop());
       video.srcObject = null;
     }
+    setIsPlaying(false);
   }, []);
   const setAiMode = useCallback((mode: number, subMode?: number) => {
     if (selectedDevice) {
@@ -225,7 +234,9 @@ function App() {
         <p>Please wait while we detecting devices...</p>
         <div className="spinner"></div>
         <p>If no devices is found after 5 seconds, please check the connection and try again by clicking the refresh button.</p>
-        <button id="refresh-cameras" onClick={() => window.ipcRenderer.listDevices()}>🔄</button>
+        <button id="refresh-cameras" onClick={() => window.ipcRenderer.listDevices()} title="Refresh camera list" aria-label="Refresh camera list">
+          <RefreshIcon size={20} />
+        </button>
       </>
     );
   }
@@ -237,13 +248,42 @@ function App() {
       .filter(Boolean),
   );
 
+  const aiSubModeLabels: Record<number, string> = {
+    [AiSubModeHumans.Normal]: 'Normal',
+    [AiSubModeHumans.UpperBody]: 'Upper Body',
+    [AiSubModeHumans.CloseUp]: 'Close Up',
+    [AiSubModeHumans.Headless]: 'Headless',
+    [AiSubModeHumans.LowerBody]: 'Lower Body',
+    [AiSubModeHumans.Butt]: 'Butt',
+  };
+  const aiModeLabels: Record<number, string> = {
+    [AiWorkModes.None]: 'Off',
+    [AiWorkModes.Group]: 'Group',
+    [AiWorkModes.Hand]: 'Hand',
+    [AiWorkModes.WhiteBoard]: 'Whiteboard',
+    [AiWorkModes.Desk]: 'Desk',
+    [AiWorkModes.Butt]: 'Butt',
+  };
+  const activeAiMode = (() => {
+    const mode = status?.ai_mode;
+    if (typeof mode !== 'number') return undefined;
+    if (mode === AiWorkModes.Human) {
+      const sub = status?.ai_sub_mode;
+      return typeof sub === 'number' ? (aiSubModeLabels[sub] ?? 'Human') : 'Human';
+    }
+    return aiModeLabels[mode];
+  })();
+
+  const gimbalAttitude = status?.gimbal as GimbalAttitude | undefined;
+  const gimbalAngles = `Pitch ${formatAngle(gimbalAttitude?.pitch)} · Pan ${formatAngle(gimbalAttitude?.pan)} · Roll ${formatAngle(gimbalAttitude?.roll)}`;
+
   return (
     <>
     <h1>OBSNIX: Obsbot control center</h1>
 
     <div className="main-container">
         <div id="video-container">
-            <video id="video" autoPlay={true} ref={videoRef}></video>
+            <video id="video" className={mirrorVideo ? 'mirrored' : ''} autoPlay={true} ref={videoRef}></video>
             <canvas id="last-frame-canvas" className="last-frame-canvas hidden"></canvas>
             <div id="video-overlay" className="video-overlay hidden">
                 <div className="overlay-content">
@@ -254,8 +294,7 @@ function App() {
         </div>
 
         <div className="controls-container">
-            <div className="control-group">
-                <h2>Video</h2>
+            <CollapsibleSection id="video" title="Video">
                 <div id="video-controls">
                     <SourceSelector
                       devices={devices}
@@ -265,9 +304,24 @@ function App() {
                       onClearManual={(key) => handleManualClear(devices[key])}
                     />
                     <div className="video-actions">
-                        <button id="refresh-cameras" onClick={() => window.ipcRenderer.listDevices()}>🔄</button>
-                        <button id="start-video" onClick={() => playerPlay(true)}>Display Video</button>
-                        <button id="stop-video" onClick={() => playerStop()}>Stop Video</button>
+                      <ToggleButton
+                        label="Mirror image"
+                        isActive={mirrorVideo}
+                        className="flex-grow"
+                        tooltip={`${mirrorVideo ? 'Disable' : 'Enable'} horizontal mirroring of the preview.`}
+                        onToggle={() => setMirrorVideo(!mirrorVideo)}
+                      />
+                      <button
+                        id="refresh-cameras"
+                        onClick={() => window.ipcRenderer.listDevices()}
+                        title="Refresh camera list"
+                        aria-label="Refresh camera list"
+                      ><RefreshIcon size={18} /></button>
+                      <button
+                        id="toggle-video"
+                        className={isPlaying ? 'is-playing' : ''}
+                        onClick={() => (isPlaying ? playerStop() : playerPlay(true))}
+                      >{isPlaying ? 'Stop Video' : 'Display Video'}</button>
                     </div>
                 </div>
                 {permissionError && (
@@ -275,10 +329,27 @@ function App() {
                     Camera access was refused or unavailable, so cameras cannot be matched automatically: {permissionError}
                   </p>
                 )}
-            </div>
-
-            <div className="control-group">
-                <h2>AI Control Target Tracking</h2>
+            </CollapsibleSection>
+            {selectedDevice && devices[selectedDevice]?.family === 'Tiny' && (
+              <CollapsibleSection
+                id="gimbal"
+                title={<>Gimbal <span className="section-status">{gimbalAngles}</span></>}
+                defaultOpen={false}
+              >
+                  <GimbalControl
+                    deviceSn={selectedDevice}
+                    onRefreshStatus={() => {
+                      window.ipcRenderer.getDeviceStatus(selectedDevice).then(setStatus);
+                    }}
+                  />
+                  <p className="gimbal-hint">Manual control turns off AI tracking.</p>
+              </CollapsibleSection>
+            )}
+            <CollapsibleSection
+              id="ai-control"
+              title={<>AI Control Target Tracking{activeAiMode ? <span className="section-status">{activeAiMode}</span> : null}</>}
+              defaultOpen={false}
+            >
                 <div id="controls">
                     <button
                       className={status?.ai_mode === AiWorkModes.None ? 'active' : ''}
@@ -336,10 +407,10 @@ function App() {
                       onClick={() => setAiMode(AiWorkModes.Group)}
                     >Group</button>
                 </div>
-            </div>
+            </CollapsibleSection>
+
             {(devices[selectedDevice || '']?.family === 'Tiny') && (
-              <div className="control-group ai-gestures-group">
-                  <h2>Ai gestures</h2>
+              <CollapsibleSection id="gestures" title="AI Gestures" className="ai-gestures-group" defaultOpen={false}>
                   <div id="toggle-controls">
                     <ToggleButton
                       label="Gesture Target"
@@ -401,7 +472,7 @@ function App() {
                       }}
                     />
                   </div>
-              </div>
+              </CollapsibleSection>
             )}
 
             {/* <div className="control-group diagnostic-group">
