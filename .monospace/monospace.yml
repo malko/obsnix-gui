@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/software-t-rex/monospace/main/apps/monospace/schemas/monospace.schema.json
 go_mod_prefix: example.com
 js_package_manager: npm@10.9.3
-preferred_output_mode: grouped
+preferred_output_mode: interleaved
 cache_max_entries: 3
 projects:
     apps/gui: internal
@@ -15,13 +15,11 @@ pipeline:
     gui#dev:
         description: Run dev script from apps/gui/package.json
         persistent: true
-        output_mode: interleaved
+    gui#publish:
+        description: Run publish script from apps/gui/package.json
     sdk#build:
         description: Run build script from libs/sdk/package.json
-        output_mode: interleaved
     sdk#install:
         description: Run install script from libs/sdk/package.json
-        output_mode: interleaved
     sdk#test:
         description: Run test script from libs/sdk/package.json
-        output_mode: interleaved
