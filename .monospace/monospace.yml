@@ -2,6 +2,7 @@
 go_mod_prefix: example.com
 js_package_manager: npm@10.9.3
 preferred_output_mode: grouped
+cache_max_entries: 3
 projects:
     apps/gui: internal
     libs/sdk: git@github.com:malko/obsbot-js-sdk.git
